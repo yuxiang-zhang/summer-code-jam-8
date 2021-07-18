@@ -98,12 +98,13 @@ class Lawn(ArrayWin):
 
         def marching_scoreboard() -> None:
             """Animate scoreboard with marching texts."""
-            head = self.scoreboard[1, 0]
-            tail = self.scoreboard[1, 1:]
-            self.scoreboard[1, :-1] = tail
-            self.scoreboard[1, -1] = head
+            head = self._scoreboard[1, 0]
+            tail = self._scoreboard[1, 1:]
+            self._scoreboard[1, :-1] = tail
+            self._scoreboard[1, -1] = head
 
-        self._marching_task = self._gsm.schedule(marching_scoreboard, delay=delay, n=120)
+        if self._gsm:
+            self._marching_task = self._gsm.schedule(marching_scoreboard, delay=delay, n=120)
 
     def init_lawn(self) -> None:
         """Initialize game board for the next game."""
@@ -127,14 +128,51 @@ class Lawn(ArrayWin):
 
         self._solution_map = self.build_solution()
 
-        # Erase shoutout text
-        self.scoreboard[:, :] = ' '
-        self.scoreboard[1, :8] = "Welcome!"
-
-        self.schedule_marching()
+        self.unload_screen()
+        self.load_screen()
 
         # Unset timer
         self.timer = None
+
+    def load_screen(self, gsm: ScreenManager = None) -> None:
+        """Add stuff to the screen."""
+        # Game ScreenManager, useful for scheduling animation task
+        if gsm:
+            self._gsm = gsm
+        if self._gsm:
+            # Scoreboard display scores and shoutout banner
+            self._scoreboard = self._gsm.root.new_widget(OFFSET_TOP + self._shape[0] + 2, OFFSET_LEFT,
+                                                         height=2, width=self._shape[1],
+                                                         color=colors.RED_ON_BLACK, create_with=ArrayWin)
+
+            # List instructions on the side
+            self._instructions = self._gsm.root.new_widget(OFFSET_TOP, OFFSET_LEFT + self._shape[1] + 2,
+                                                           height=6, width=20,
+                                                           color=colors.YELLOW_ON_BLACK, create_with=ArrayWin)
+
+            # Erase shoutout text
+            self._scoreboard[:, :] = ' '
+            self._scoreboard[1, :8] = "Welcome!"
+
+            # Set instructions
+            self._instructions[0, :] = 'r: reset game'.ljust(text_len, ' ')
+            self._instructions[1, :] = 'g: give up game'.ljust(text_len, ' ')
+            self._instructions[2, :] = '␣: uncover location'.ljust(text_len, ' ')
+            self._instructions[3, :] = 'f: flag mine'.ljust(text_len, ' ')
+            self._instructions[4, :] = 'arrows: move pointer'.ljust(text_len, ' ')
+            self._instructions[5, :] = 'esc: leave game'.ljust(text_len, ' ')
+
+            self.schedule_marching()
+
+    def unload_screen(self) -> None:
+        """Remove stuff from the screen."""
+        if self._gsm and self._scoreboard:
+            self._gsm.root.remove_widget(self._scoreboard)
+            self._scoreboard = None
+
+        if self._gsm and self._instructions:
+            self._gsm.root.remove_widget(self._instructions)
+            self._instructions = None
 
     def build_solution(self) -> np.ndarray:
         """Count mines near each land in adjacent lands."""
@@ -158,16 +196,30 @@ class Lawn(ArrayWin):
             self.revealed = True
             self[:, :] = np.where(self._mine_map, MINE_SYMBOL, self[:, :])
 
+    def resize(self, rows: int, cols: int, num_mines: int) -> None:
+        """Resize game board."""
+        self._shape = rows, cols
+        self.height, self.width = rows, cols
+        self._num_mines = num_mines
+
         # Game board records the state of each cell
+        self._state_map = np.zeros((rows, cols)).astype(int)
+
+        # Initialize with given mine amount
+        self._mine_map = np.r_[np.full(rows * cols - num_mines, False), np.full(num_mines, True)]
+        self._solution_map = np.zeros((rows, cols)).astype(int)
+
+        return super()._resize()
+
     def refresh(self) -> None:
         """Handle terminal display refresh."""
         if self.timer and not self.revealed:
             # Timer on the right of scoreboard
-            self.scoreboard[0, -3:] = str(int(self.timer)).rjust(3, '0')
+            self._scoreboard[0, -3:] = str(int(self.timer)).rjust(3, '0')
             self.timer += DELTA
 
             # Flagging count on the left
-            self.scoreboard[0, :3] = str(self._num_mines - (self._state_map == FLAGGED_STATE).sum()).rjust(3, '0')
+            self._scoreboard[0, :3] = str(self._num_mines - (self._state_map == FLAGGED_STATE).sum()).rjust(3, '0')
 
         return super().refresh()
 
@@ -176,7 +228,7 @@ class Lawn(ArrayWin):
         # Initialize timer
         if not self.timer:
             self.timer = DELTA
-            self.scoreboard[1, :] = ' '
+            self._scoreboard[1, :] = ' '
             self._marching_task.cancel()
 
         if key == FORFEIT_KEY:
@@ -243,8 +295,8 @@ class Lawn(ArrayWin):
                               BOXEDCHECK_SYMBOL, self._solution_map)
 
         # Put up smiley and winning shoutout
-        self.scoreboard[0, len(self.scoreboard[0]) // 2] = HAPPYFACE_SYMBOL
-        self.scoreboard[1, :8] = "You win!"
+        self._scoreboard[0, len(self._scoreboard[0]) // 2] = HAPPYFACE_SYMBOL
+        self._scoreboard[1, :8] = "You win!"
         self.schedule_marching(.1)
 
         self.revealed = True
@@ -263,8 +315,8 @@ class Lawn(ArrayWin):
         self.colors = colors_copy
 
         # Put up sad face and losing callout
-        self.scoreboard[0, len(self.scoreboard[0]) // 2] = SADFACE_SYMBOL
-        self.scoreboard[1, :8] = "You die!"
+        self._scoreboard[0, len(self._scoreboard[0]) // 2] = SADFACE_SYMBOL
+        self._scoreboard[1, :8] = "You die!"
         self.schedule_marching(.8)
 
         self.revealed = True
@@ -286,22 +338,11 @@ with ScreenManager() as gsm:
 
     text_len = 20
 
-    # Draw the scoreboard on the bottom
-    scoreboard = gsm.root.new_widget(OFFSET_TOP + rows + 2, OFFSET_LEFT, height=2, width=cols,
-                                     color=colors.RED_ON_BLACK, create_with="ArrayWin")
-
-    # Draw instructions on the side
-    instructions = gsm.root.new_widget(OFFSET_TOP, OFFSET_LEFT + cols + 2, height=6, width=text_len,
-                                       color=colors.YELLOW_ON_BLACK, create_with="ArrayWin")
-    instructions[0, :] = 'r: reset game'.ljust(text_len, ' ')
-    instructions[1, :] = 'g: give up game'.ljust(text_len, ' ')
-    instructions[2, :] = '␣: uncover location'.ljust(text_len, ' ')
-    instructions[3, :] = 'f: flag mine'.ljust(text_len, ' ')
-    instructions[4, :] = 'arrows: move pointer'.ljust(text_len, ' ')
-    instructions[5, :] = 'esc: leave game'.ljust(text_len, ' ')
-
     # Draw board
     lawn = gsm.root.new_widget(rows=rows, cols=cols, num_mines=num_mines, create_with=Lawn)
+    lawn.init_lawn()
+    lawn.load_screen(gsm)
+    lawn.resize(rows * 2, cols * 2, 10)
     lawn.init_lawn()
 
     # Draw Cursor
