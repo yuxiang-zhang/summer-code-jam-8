@@ -83,28 +83,15 @@ class Cursor(Widget):
 class Lawn(ArrayWin):
     """MineSweeper Game Board."""
 
-    def __init__(self, rows: int, cols: int, num_mines: int,
-                 scoreboard: ArrayWin, gsm: ScreenManager, *args, **kwargs) -> None:
+    def __init__(self, rows: int, cols: int, num_mines: int, *args, **kwargs) -> None:
 
         # Initialize display from ArrayWin
         super().__init__(OFFSET_TOP, OFFSET_LEFT, rows, cols, *args, **kwargs)
 
-        self._shape = rows, cols
-        self._num_mines = num_mines
-
-        # Game board records the state of each cell
-        self._state_map = np.zeros((rows, cols)).astype(int)
-
-        # Initialize with given mine amount
-        self._mine_map = np.r_[np.full(rows * cols - num_mines, False), np.full(num_mines, True)]
-        self._solution_map = np.zeros((rows, cols)).astype(int)
-
-        # Scoreboard display scores and shoutout banner
-        self.scoreboard = scoreboard
-
-        # Game ScreenManager, useful for scheduling animation task
-        self._gsm = gsm
+        self._gsm = None
         self._marching_task = None
+
+        self.resize(rows, cols, num_mines)
 
     def schedule_marching(self, delay: int = .3) -> None:
         """Use ScreenManager handle to animate scoreboard text."""
@@ -171,6 +158,7 @@ class Lawn(ArrayWin):
             self.revealed = True
             self[:, :] = np.where(self._mine_map, MINE_SYMBOL, self[:, :])
 
+        # Game board records the state of each cell
     def refresh(self) -> None:
         """Handle terminal display refresh."""
         if self.timer and not self.revealed:
@@ -313,8 +301,7 @@ with ScreenManager() as gsm:
     instructions[5, :] = 'esc: leave game'.ljust(text_len, ' ')
 
     # Draw board
-    lawn = gsm.root.new_widget(rows=rows, cols=cols, num_mines=num_mines,
-                               scoreboard=scoreboard, gsm=gsm, create_with=Lawn)
+    lawn = gsm.root.new_widget(rows=rows, cols=cols, num_mines=num_mines, create_with=Lawn)
     lawn.init_lawn()
 
     # Draw Cursor
