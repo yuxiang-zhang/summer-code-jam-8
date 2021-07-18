@@ -1,8 +1,10 @@
 
+from itertools import cycle
+
 import numpy as np
 
 from nurses import ScreenManager, Widget, colors
-from nurses.keys import DOWN, LEFT, RIGHT, UP
+from nurses.keys import DOWN, LEFT, RIGHT, TAB, UP
 from nurses.widgets import ArrayWin
 
 # Keybindings
@@ -93,6 +95,7 @@ class Lawn(ArrayWin):
         self._gsm = None
         self._marching_task = None
 
+        self.difficulties = cycle([(9, 11, 10), (16, 16, 40), (16, 30, 99)])
         self.resize(rows, cols, num_mines)
 
     def schedule_marching(self, delay: int = .3) -> None:
@@ -147,9 +150,19 @@ class Lawn(ArrayWin):
                                                          height=2, width=self._shape[1],
                                                          color=colors.RED_ON_BLACK, create_with=ArrayWin)
 
+            instructions = [
+                '↹: change difficulty',
+                'r: reset game',
+                'g: give up game',
+                '␣: uncover location',
+                'f: flag mine',
+                'arrows: move pointer',
+                'esc: leave game'
+            ]
+
             # List instructions on the side
             self._instructions = self._gsm.root.new_widget(OFFSET_TOP, OFFSET_LEFT + self._shape[1] + 2,
-                                                           height=6, width=20,
+                                                           height=len(instructions), width=20,
                                                            color=colors.YELLOW_ON_BLACK, create_with=ArrayWin)
 
             # Erase shoutout text
@@ -157,12 +170,8 @@ class Lawn(ArrayWin):
             self._scoreboard[1, :8] = "Welcome!"
 
             # Set instructions
-            self._instructions[0, :] = 'r: reset game'.ljust(text_len, ' ')
-            self._instructions[1, :] = 'g: give up game'.ljust(text_len, ' ')
-            self._instructions[2, :] = '␣: uncover location'.ljust(text_len, ' ')
-            self._instructions[3, :] = 'f: flag mine'.ljust(text_len, ' ')
-            self._instructions[4, :] = 'arrows: move pointer'.ljust(text_len, ' ')
-            self._instructions[5, :] = 'esc: leave game'.ljust(text_len, ' ')
+            for i, line in enumerate(instructions):
+                self._instructions[i, :] = line.ljust(text_len, ' ')
 
             self.schedule_marching()
 
@@ -235,6 +244,15 @@ class Lawn(ArrayWin):
 
         if key == FORFEIT_KEY:
             self.reveal_mines()
+
+        elif key == TAB:
+            params = next(self.difficulties)
+            self.resize(*params)
+            self.init_lawn()
+            self._scoreboard[1, :] = '{}x{}/{}x{}'.format(*self._shape,
+                                                          MINE_SYMBOL, self._num_mines).ljust(self._shape[1], ' ')
+
+            cursor.set_wrapping(*self._shape)
 
         elif key == RESET_KEY:
             self.init_lawn()
@@ -344,7 +362,7 @@ with ScreenManager() as gsm:
     lawn = gsm.root.new_widget(rows=rows, cols=cols, num_mines=num_mines, create_with=Lawn)
     lawn.init_lawn()
     lawn.load_screen(gsm)
-    lawn.resize(rows * 2, cols * 2, 10)
+    lawn.resize(rows * 2, cols * 2, num_mines)
     lawn.init_lawn()
 
     # Draw Cursor

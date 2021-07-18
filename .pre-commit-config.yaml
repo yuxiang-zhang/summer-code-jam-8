@@ -3,7 +3,7 @@
 #
 # Please uncomment the right lines depending on your setup.
 
-exclude: ^nurses/
+exclude: ^nurses
 
 repos:
     - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -26,6 +26,7 @@ repos:
             language: system
             types: [python]
             require_serial: true
+            exclude: nurses/
           - id: flake8
             name: Flake8
             entry: python -m flake8 # Default Env setup
