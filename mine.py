@@ -48,10 +48,12 @@ class Cursor(Widget):
     offset_top = OFFSET_TOP
     offset_left = OFFSET_LEFT
 
-    def __init__(self, wrap_height: int, wrap_width: int, *args, **kwargs):
-        self.wrap_height = wrap_height
-        self.wrap_width = wrap_width
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def set_wrapping(self, height: int, width: int) -> None:
+        """Set Cursor movement wrapping height and width."""
+        self.wrap_height, self.wrap_width = height, width
 
     def on_press(self, key: int) -> bool:
         """Handle keys for Cursor movement."""
@@ -346,8 +348,9 @@ with ScreenManager() as gsm:
     lawn.init_lawn()
 
     # Draw Cursor
-    cursor = gsm.root.new_widget(rows, cols, OFFSET_TOP, OFFSET_LEFT, 1, 1, transparent=True, create_with=Cursor)
+    cursor = gsm.root.new_widget(OFFSET_TOP, OFFSET_LEFT, 1, 1, transparent=True, create_with=Cursor)
     cursor.window.addstr(0, 0, CURSOR_SYMBOL)
+    cursor.set_wrapping(rows * 2, cols * 2)
 
     # Schedule refreshing task
     gsm.schedule(gsm.root.refresh, delay=DELTA)
